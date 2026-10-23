@@ -58,10 +58,6 @@
         </svg>
         <span id="navAuthLabel">Sign In / Register</span>
       </button>
-
-      <button id="resetDemoBtn" class="btn-secondary" title="Reset Logs and Database">
-        Reset Demo
-      </button>
     </div>
   </header>
 
@@ -687,26 +683,14 @@
           <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Username or Email</label>
           <input type="text" id="loginIdentifier" class="form-input" placeholder="e.g. vyomsinghal or alice_swift" style="width: 100%;">
         </div>
-        <div style="margin-bottom: 1.25rem;">
+        <div style="margin-bottom: 1.5rem;">
           <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Password</label>
           <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" style="width: 100%;">
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">(Demo accounts can sign in with any password)</div>
         </div>
 
-        <button type="button" id="submitLoginBtn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.95rem; margin-bottom: 1rem;">
-          Sign In to Active Workspace &rarr;
+        <button type="button" id="submitLoginBtn" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.5rem;">
+          Sign In to Workspace &rarr;
         </button>
-
-        <!-- Quick 1-Click Demo Profiles -->
-        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">Or quick-access a demo profile:</div>
-          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center;">
-            <button type="button" class="btn-secondary demo-quick-btn" data-user="alice_swift" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Alice (Engineer)</button>
-            <button type="button" class="btn-secondary demo-quick-btn" data-user="bob_deliberate" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Bob (Compliance)</button>
-            <button type="button" class="btn-secondary demo-quick-btn" data-user="charlie_analyst" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Charlie (Risk)</button>
-            <button type="button" class="btn-secondary demo-quick-btn" data-user="Vyom Singhal" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; color: var(--accent-cyan); font-weight: 600;">Vyom Singhal</button>
-          </div>
-        </div>
       </div>
 
       <!-- ------------------------------------------------------------- -->
@@ -714,7 +698,7 @@
       <!-- ------------------------------------------------------------- -->
       <div id="authSignUpForm" style="display: none;">
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.65rem 0.85rem; font-size: 0.78rem; color: #166534; margin-bottom: 1rem;">
-          💡 <strong>Biometric Enrollment Pipeline:</strong> After filling in your details, you will type 3 short calibration passages to enroll your personal keystroke rhythm.
+          💡 <strong>Biometric Enrollment Pipeline:</strong> After creating your profile, you will type 3 short calibration passages to enroll your personal keystroke rhythm.
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
@@ -750,10 +734,10 @@
         </button>
       </div>
 
-      <!-- Close / Skip Button -->
-      <div style="text-align: center; margin-top: 1.25rem;">
-        <button type="button" id="skipAuthBtn" style="background: none; border: none; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;">
-          Explore terminal as guest (Demo Mode)
+      <!-- Close Link (shown when user opens from top nav) -->
+      <div id="closeAuthModalRow" style="text-align: center; margin-top: 1.25rem; display: none;">
+        <button type="button" id="closeAuthModalBtn" style="background: none; border: none; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; text-decoration: underline;">
+          Return to Workspace
         </button>
       </div>
 

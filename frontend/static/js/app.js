@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initImposterControls();
     initMfaModal();
     initAlertSettingsModal();
-    initResetButton();
 
     // Fetch enrolled users and start initial session
     loadUsers();
@@ -43,7 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function initAuthPortal() {
     const modal = document.getElementById('authWelcomeModal');
     const openBtn = document.getElementById('openAuthModalBtn');
-    const skipBtn = document.getElementById('skipAuthBtn');
+    const closeBtn = document.getElementById('closeAuthModalBtn');
+    const closeRow = document.getElementById('closeAuthModalRow');
     const tabSignIn = document.getElementById('authTabSignIn');
     const tabSignUp = document.getElementById('authTabSignUp');
     const formSignIn = document.getElementById('authSignInForm');
@@ -116,9 +116,12 @@ function initAuthPortal() {
     openBtn?.addEventListener('click', () => {
         modal.classList.add('active');
         if (banner) banner.style.display = 'none';
+        if (closeRow) {
+            closeRow.style.display = State.authenticatedUser ? 'block' : 'none';
+        }
     });
 
-    skipBtn?.addEventListener('click', () => {
+    closeBtn?.addEventListener('click', () => {
         modal.classList.remove('active');
     });
 
@@ -258,20 +261,6 @@ function initAuthPortal() {
             submitRegisterBtn.disabled = false;
             submitRegisterBtn.textContent = 'Create Account & Proceed to Biometric Enrollment →';
         }
-    });
-
-    // Quick demo 1-click logins
-    document.querySelectorAll('.demo-quick-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const user = btn.getAttribute('data-user');
-            if (user) {
-                const idEl = document.getElementById('loginIdentifier');
-                const pwdEl = document.getElementById('loginPassword');
-                if (idEl) idEl.value = user;
-                if (pwdEl) pwdEl.value = 'demo123';
-                submitLoginBtn.click();
-            }
-        });
     });
 }
 
@@ -876,18 +865,4 @@ async function loadMetrics() {
     }
 }
 
-// -------------------------------------------------------------
-// Demo Reset Handler
-// -------------------------------------------------------------
-function initResetButton() {
-    document.getElementById('resetDemoBtn')?.addEventListener('click', async () => {
-        if (!confirm('Reset verification logs and database?')) return;
-        try {
-            await fetch('/api/reset', { method: 'POST' });
-            alert('Database reset. Re-seeding baseline profiles...');
-            window.location.reload();
-        } catch (e) {
-            console.error('Reset failed:', e);
-        }
-    });
-}
+

@@ -245,8 +245,8 @@ def hash_password(password: str) -> str:
 def register_user(username: str, full_name: str, email: str, phone: str, password: str) -> dict:
     """
     Registers a new user account with personal details.
-    Initial status is 'pending_enrollment' until typing calibration passages are completed.
-    Also links email and phone to alert settings.
+    Checks the database to verify if user already exists (by username, email, or phone).
+    If user already exists, returns an error. Otherwise creates a new profile with status 'pending_enrollment'.
     """
     username = (username or "").strip()
     full_name = (full_name or "").strip()
@@ -260,32 +260,37 @@ def register_user(username: str, full_name: str, email: str, phone: str, passwor
     conn = get_db()
     cursor = conn.cursor()
 
-    # Check if username exists with a password already
-    cursor.execute("SELECT username, password_hash, status FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-    existing = cursor.fetchone()
-    if existing and existing["password_hash"]:
+    # 1. Check if username already exists in database
+    cursor.execute("SELECT username, email, phone FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    existing_user = cursor.fetchone()
+    if existing_user:
         conn.close()
-        return {"success": False, "error": f"Username '{username}' is already registered. Please sign in."}
+        return {"success": False, "error": f"An account with username '{username}' already exists. Please sign in."}
 
+    # 2. Check if email already exists
+    if email:
+        cursor.execute("SELECT username FROM users WHERE email != '' AND LOWER(email) = LOWER(?)", (email,))
+        existing_email = cursor.fetchone()
+        if existing_email:
+            conn.close()
+            return {"success": False, "error": f"An account with email '{email}' already exists. Please sign in."}
+
+    # 3. Check if phone already exists
+    if phone:
+        cursor.execute("SELECT username FROM users WHERE phone != '' AND phone = ?", (phone,))
+        existing_phone = cursor.fetchone()
+        if existing_phone:
+            conn.close()
+            return {"success": False, "error": f"An account with phone number '{phone}' already exists. Please sign in."}
+
+    # 4. User does not exist -> Create new user profile
     pwd_hash = hash_password(password) if password else ""
     now = datetime.now(timezone.utc).isoformat()
 
-    if existing:
-        cursor.execute("""
-            UPDATE users
-            SET full_name = ?,
-                email = ?,
-                phone = ?,
-                password_hash = ?,
-                status = CASE WHEN status = 'enrolled' THEN 'enrolled' ELSE 'pending_enrollment' END
-            WHERE LOWER(username) = LOWER(?)
-        """, (full_name, email, phone, pwd_hash, username))
-    else:
-        cursor.execute("""
-            INSERT INTO users (username, full_name, email, phone, password_hash, created_at, status, model_version, total_samples)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending_enrollment', 'v1.0', 0)
-        """, (username, full_name, email, phone, pwd_hash, now))
-
+    cursor.execute("""
+        INSERT INTO users (username, full_name, email, phone, password_hash, created_at, status, model_version, total_samples)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending_enrollment', 'v1.0', 0)
+    """, (username, full_name, email, phone, pwd_hash, now))
     conn.commit()
 
     # Auto-link alert preferences if email/phone provided
