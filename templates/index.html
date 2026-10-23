@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeyStro - AI-Powered Continuous Keystroke Authentication</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- Chart.js CDN for real-time telemetry stream visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="brand-section">
+      <div class="brand-logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004 11m0 0a8.003 8.003 0 0115.357-2m1.571 2.472a11.96 11.96 0 00-.928-3.042" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div style="display: flex; align-items: center;">
+          <h1>KeyStro</h1>
+          <span class="brand-badge">TRISHUL</span>
+        </div>
+        <p class="tagline">Your Typing, Your Identity, Your Security</p>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <!-- User Selector -->
+      <div class="user-selector-container">
+        <label for="userSelect">Active Profile:</label>
+        <select id="userSelect" class="user-select">
+          <option value="" disabled>Loading users...</option>
+        </select>
+      </div>
+
+      <!-- Live Session Status Badge -->
+      <div id="sessionStatusBadge" class="session-badge status-secure">
+        <span class="status-dot"></span>
+        <span id="sessionStatusText">ACTIVE &bull; VERIFIED</span>
+      </div>
+
+      <button id="resetDemoBtn" class="btn-secondary" title="Reset Logs and Database">
+        Reset Demo
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" data-tab="workspacePane">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+      Active Workspace &amp; HUD
+    </button>
+    <button class="tab-btn" data-tab="enrollmentPane">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      User Enrollment &amp; Calibration
+    </button>
+    <button class="tab-btn" data-tab="analyticsPane">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      Security Analytics &amp; Logs
+    </button>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+
+    <!-- 1. ACTIVE WORKSPACE TAB -->
+    <div id="workspacePane" class="tab-pane active">
+      <div class="dashboard-grid">
+
+        <!-- Left Column: Workspace Editor & Simulator -->
+        <div class="workspace-container">
+          <div class="card">
+            <!-- Mock Corporate Bank Header -->
+            <div class="portal-header">
+              <div class="portal-info">
+                <div class="portal-avatar" id="avatarLetter">A</div>
+                <div class="portal-meta">
+                  <h4 id="portalUserName">Apex Corporate Terminal</h4>
+                  <span id="portalSessionId">Session: Initializing...</span>
+                </div>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono);">
+                PROTECTED BY AI KEYSTROKE BIOMETRICS
+              </div>
+            </div>
+
+            <!-- Continuous Online Adaptation ("Train Ahead") Card -->
+            <div class="continuous-learning-card" id="continuousLearningCard">
+              <div class="cl-header">
+                <div class="cl-title-group">
+                  <span class="cl-icon">🧠</span>
+                  <span class="cl-title">Continuous Online Adaptation</span>
+                  <span class="cl-badge" id="modelVerBadge">Model v1.0</span>
+                </div>
+                <div class="cl-counter">
+                  <span id="clWordsCount">0</span> / <span id="clWordsThreshold">200</span> words
+                </div>
+              </div>
+              <div class="cl-progress-track">
+                <div class="cl-progress-fill" id="clProgressBar" style="width: 0%;"></div>
+              </div>
+              <div class="cl-footer-info">
+                <span id="clStatusText">Type in workspace editor. Model automatically trains ahead every 200 verified words.</span>
+                <span id="clAdaptationsCount">Adaptations: 0</span>
+              </div>
+            </div>
+
+            <!-- Monitored Input Sandbox -->
+            <div class="workspace-textarea-wrapper" style="margin-top: 1rem;">
+              <textarea 
+                id="workspaceInput" 
+                class="workspace-textarea" 
+                placeholder="Type continuously here to test live keystroke authentication...&#10;&#10;Try typing in your natural rhythm, or toggle the Imposter Mode below to see how KeyStro instantly identifies rhythm anomalies and locks the session!"
+              ></textarea>
+              <div class="watermark-badge">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Zero text stored &bull; Timing dynamics only</span>
+              </div>
+            </div>
+
+            <!-- Imposter Simulation Toolbar -->
+            <div class="imposter-toolbar">
+              <div class="imposter-status">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="imposterToggle">
+                  <span class="toggle-slider"></span>
+                </label>
+                <div>
+                  <div class="imposter-title">Imposter Attack Simulator</div>
+                  <div class="imposter-desc">Inject abnormal typing cadence &amp; latency into live keystrokes</div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label for="imposterProfile" style="font-size: 0.75rem; color: var(--text-secondary);">Profile:</label>
+                <select id="imposterProfile" class="user-select" style="background: #ffffff; color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.3rem 0.6rem; border-radius: 4px;">
+                  <option value="slow_heavy">Hunt &amp; Peck (Slow Heavy Dwell)</option>
+                  <option value="robotic_fast">Automated Bot (Flat Cadence)</option>
+                  <option value="erratic">Fatigued / Erratic Jitter</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Quick Burst Testing Buttons -->
+            <div class="quick-sim-buttons" style="flex-wrap: wrap; gap: 0.5rem;">
+              <button id="injectGenuineBtn" class="btn-secondary">
+                &plus; Inject Genuine Typing Burst
+              </button>
+              <button id="inject200WordsBtn" class="btn-secondary" style="border-color: rgba(2, 132, 199, 0.4); color: var(--accent-cyan); font-weight: 600;">
+                ⚡ Fast-Forward 200 Words (Train Ahead)
+              </button>
+              <button id="injectImposterBtn" class="btn-secondary" style="border-color: rgba(239, 68, 68, 0.4); color: var(--danger-red);">
+                &times; Inject Imposter Attack Burst
+              </button>
+              <button id="retrainModelBtn" class="btn-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: #059669; font-weight: 600;" title="Retrain user model with clean background exclusion boundaries">
+                🔄 Retrain Model
+              </button>
+              <button id="loadRandomTextBtn" class="btn-secondary" title="Load random text into editor">
+                🎲 Load Random Text
+              </button>
+              <button id="clearWorkspaceBtn" class="btn-secondary" style="margin-left: auto;">
+                Clear Editor
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Live Telemetry HUD -->
+        <div class="hud-telemetry">
+
+          <!-- Confidence Gauge Card -->
+          <div class="card meter-card">
+            <div class="card-header" style="width: 100%;">
+              <span class="card-title">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Identity Confidence
+              </span>
+              <span id="modelIndicator" class="card-subtitle">Hybrid IF + RF</span>
+            </div>
+
+            <!-- Animated SVG Gauge -->
+            <div class="gauge-wrapper">
+              <svg class="gauge-svg" viewBox="0 0 200 120">
+                <!-- Background Arc -->
+                <path class="gauge-bg" d="M 20 105 A 80 80 0 0 1 180 105" />
+                <!-- Fill Arc: stroke-dasharray="251.2" -->
+                <path id="gaugeFillPath" class="gauge-fill" d="M 20 105 A 80 80 0 0 1 180 105" stroke-dasharray="251.2" stroke-dashoffset="30" />
+              </svg>
+              <div class="gauge-readout">
+                <span id="gaugeValueText" class="gauge-value" style="color: var(--secure-green);">92%</span>
+                <span class="gauge-unit">Confidence Score</span>
+              </div>
+            </div>
+
+            <!-- Risk Banner -->
+            <div id="riskLevelBanner" class="risk-level-banner" style="background: rgba(16, 185, 129, 0.15); color: var(--secure-green); border: 1px solid rgba(16, 185, 129, 0.3);">
+              LOW RISK &bull; GENUINE OPERATOR
+            </div>
+            <p id="riskStatusDesc" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.35rem; margin-bottom: 0.25rem; text-align: center; line-height: 1.35;">
+              Active typing rhythm closely matches enrolled behavioral biometric baseline.
+            </p>
+
+            <!-- Instant Stat Pills -->
+            <div class="stat-pill-row" style="width: 100%;">
+              <div class="stat-pill">
+                <div class="stat-pill-label">Speed</div>
+                <div id="hudSpeed" class="stat-pill-value">-- KPM</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill-label">Dwell</div>
+                <div id="hudDwell" class="stat-pill-value">-- ms</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill-label">Flight</div>
+                <div id="hudFlight" class="stat-pill-value">-- ms</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Timing Stream Chart -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Real-Time Telemetry Stream
+              </span>
+              <span class="card-subtitle">Dwell vs Flight Latency</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="telemetryChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. ENROLLMENT & CALIBRATION TAB -->
+    <div id="enrollmentPane" class="tab-pane">
+      <div class="enrollment-container">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">New User Enrollment &amp; Rhythm Calibration</h2>
+              <p class="card-subtitle">Train a personalized behavioral keystroke profile using 3 typing passages.</p>
+            </div>
+          </div>
+
+          <!-- Enrollment Stepper -->
+          <div class="enrollment-stepper">
+            <div id="step1" class="step-item active">
+              <div class="step-circle">1</div>
+              <span class="step-label">Passage 1</span>
+            </div>
+            <div id="step2" class="step-item">
+              <div class="step-circle">2</div>
+              <span class="step-label">Passage 2</span>
+            </div>
+            <div id="step3" class="step-item">
+              <div class="step-circle">3</div>
+              <span class="step-label">Passage 3</span>
+            </div>
+            <div id="step4" class="step-item">
+              <div class="step-circle">&check;</div>
+              <span class="step-label">Trained</span>
+            </div>
+          </div>
+
+          <!-- Username Input -->
+          <div style="margin-bottom: 1.25rem;">
+            <label for="enrollUsername" style="display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem;">
+              Username:
+            </label>
+            <input 
+              type="text" 
+              id="enrollUsername" 
+              placeholder="e.g. dev_sarah" 
+              style="width: 100%; max-width: 350px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: var(--radius-md); padding: 0.6rem 0.85rem; color: #0f172a; font-size: 0.95rem; outline: none;"
+            >
+          </div>
+
+          <!-- Target Passage Header with Randomize Button -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
+              <span>Typing Calibration Passage</span>
+              <span id="promptStepIndicator" style="font-size: 0.72rem; color: var(--accent-cyan); font-family: var(--font-mono); background: rgba(2, 132, 199, 0.12); padding: 0.15rem 0.5rem; border-radius: 4px;">Passage 1 of 3</span>
+            </div>
+            <button id="randomizePromptBtn" type="button" class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.7rem; border-color: rgba(2, 132, 199, 0.35); color: var(--accent-cyan);">
+              🎲 Randomize Text
+            </button>
+          </div>
+
+          <!-- Target Passage Text Box -->
+          <div class="prompt-display-box" id="enrollmentPromptBox">
+            <span id="promptTyped" class="prompt-typed-text"></span><span id="promptError" class="prompt-error-text"></span><span id="promptCursor" class="prompt-active-cursor"></span><span id="promptRemaining" class="prompt-remaining-text">Loading random passage...</span>
+          </div>
+
+          <!-- Real-Time Typo Detection & Accuracy Feedback Banner -->
+          <div id="enrollFeedback" class="enroll-feedback-banner feedback-idle">
+            <div id="enrollFeedbackStatus" class="enroll-feedback-status">
+              <span class="feedback-icon">⌨</span>
+              <span id="enrollFeedbackText">Type the exact passage above to calibrate your rhythm profile.</span>
+            </div>
+            <div class="enroll-feedback-metrics">
+              <span id="enrollAccuracyBadge" class="accuracy-badge accuracy-perfect">100% Accuracy</span>
+              <span id="enrollProgressRatio" class="progress-ratio">0 / 0 chars</span>
+            </div>
+          </div>
+
+          <!-- Typing Area for Calibration -->
+          <textarea 
+            id="enrollmentInput" 
+            class="enrollment-textarea" 
+            placeholder="Type the passage above at your natural, comfortable typing speed..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+          ></textarea>
+
+          <!-- Action Buttons & Progress -->
+          <div class="enrollment-actions">
+            <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.75rem;">
+              <span>Keystrokes: <span id="enrollKeyCount" style="color: var(--accent-cyan); font-weight: bold;">0</span></span>
+              <span>&bull;</span>
+              <span id="enrollPassageStatus" style="color: var(--text-muted);">Passage not submitted</span>
+            </div>
+            <button id="enrollSubmitPassageBtn" class="btn-primary" disabled title="Accurately type the passage without typos to submit">
+              Submit Passage 1 &rarr;
+            </button>
+          </div>
+
+          <!-- Completed Profile Summary (Hidden until trained) -->
+          <div id="enrollmentSummaryBox" style="display: none; margin-top: 1.5rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+            <h4 style="color: var(--secure-green); font-size: 1.05rem; margin-bottom: 0.5rem;">
+              &check; Enrollment &amp; Model Training Complete!
+            </h4>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+              Your unique typing rhythm profile has been learned and stored in the security database.
+            </p>
+            <div class="stat-pill-row">
+              <div class="stat-pill">
+                <div class="stat-pill-label">Baseline Dwell</div>
+                <div id="summaryDwell" class="stat-pill-value">-- ms</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill-label">Baseline Flight</div>
+                <div id="summaryFlight" class="stat-pill-value">-- ms</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-pill-label">Cadence Speed</div>
+                <div id="summarySpeed" class="stat-pill-value">-- KPM</div>
+              </div>
+            </div>
+            <button id="switchActiveToEnrolledBtn" class="btn-primary" style="margin-top: 1rem;">
+              Switch to Active Workspace Now
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. SECURITY ANALYTICS & AUDIT LOGS TAB -->
+    <div id="analyticsPane" class="tab-pane">
+      <!-- High-Level Security Metrics -->
+      <div class="metrics-row">
+        <div class="metric-box">
+          <div class="metric-title">Total Keystroke Evaluations</div>
+          <div id="metricTotalEvals" class="metric-number">--</div>
+          <div class="metric-desc">Continuous rolling verification chunks</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-title">False Acceptance Rate (FAR)</div>
+          <div id="metricFAR" class="metric-number" style="color: var(--secure-green);">--%</div>
+          <div class="metric-desc">Rate at which imposters breach threshold (&gt; 0.70)</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-title">False Rejection Rate (FRR)</div>
+          <div id="metricFRR" class="metric-number" style="color: var(--accent-cyan);">--%</div>
+          <div class="metric-desc">Rate at which genuine users trigger lock (&lt; 0.40)</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-title">Equal Error Rate (EER)</div>
+          <div id="metricEER" class="metric-number" style="color: var(--accent-blue);">--%</div>
+          <div class="metric-desc">Crossover biometric accuracy balance</div>
+        </div>
+      </div>
+
+      <!-- Verification Audit Trail Table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Live Verification Telemetry Audit Trail
+          </span>
+          <button id="refreshLogsBtn" class="btn-secondary">
+            Refresh Logs
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="telemetry-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Operator</th>
+                <th>Confidence Score</th>
+                <th>Risk Level</th>
+                <th>Dwell (Mean)</th>
+                <th>Flight (Mean)</th>
+                <th>Cadence (KPM)</th>
+                <th>Action Taken</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                  Loading verification logs...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Adaptive MFA Verification Modal (Triggered on Anomaly Lock) -->
+  <div id="mfaModal" class="modal-overlay">
+    <div class="mfa-modal-box">
+      <div class="mfa-icon-badge">
+        <svg width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+
+      <h3 class="mfa-title">Session Hijack Anomaly Detected</h3>
+      <p class="mfa-desc">
+        Keystroke timing dynamics diverged drastically from the enrolled biometric profile.
+        To protect enterprise assets, active session has been locked.
+      </p>
+
+      <div class="otp-simulated-hint">
+        Simulated Device SMS/Auth Push: Enter Verification OTP <strong id="simulatedOtpDisplay">123456</strong>
+      </div>
+
+      <input 
+        type="text" 
+        id="otpInput" 
+        class="otp-input" 
+        placeholder="------" 
+        maxlength="6"
+        autocomplete="off"
+      >
+
+      <div class="modal-actions">
+        <button id="verifyOtpBtn" class="btn-primary">
+          Verify &amp; Unlock
+        </button>
+        <button id="cancelMfaBtn" class="btn-secondary">
+          End Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Modular Application Scripts -->
+  <script src="/static/js/keystroke_recorder.js"></script>
+  <script src="/static/js/prompts.js"></script>
+  <script src="/static/js/telemetry.js"></script>
+  <script src="/static/js/workspace.js"></script>
+  <script src="/static/js/enrollment.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
