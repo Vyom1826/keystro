@@ -68,7 +68,9 @@ function initTabs() {
 // -------------------------------------------------------------
 // User Management & Active Session Initializer
 // -------------------------------------------------------------
-async function loadUsers() {
+let userSelectInitialized = false;
+
+async function loadUsers(preferredUser = null) {
     const userSelect = document.getElementById('userSelect');
     if (!userSelect) return;
 
@@ -87,14 +89,20 @@ async function loadUsers() {
                 userSelect.appendChild(opt);
             });
 
-            // Set initial user
-            const initialUser = data.users[0].username;
-            userSelect.value = initialUser;
-            startSession(initialUser);
+            // Retain preferred or currently active user if present, else default to first
+            const targetUser = preferredUser || State.currentUser;
+            const userExists = data.users.some((u) => u.username === targetUser);
+            const activeUser = userExists ? targetUser : data.users[0].username;
 
-            userSelect.addEventListener('change', (e) => {
-                startSession(e.target.value);
-            });
+            userSelect.value = activeUser;
+            startSession(activeUser);
+
+            if (!userSelectInitialized) {
+                userSelect.addEventListener('change', (e) => {
+                    startSession(e.target.value);
+                });
+                userSelectInitialized = true;
+            }
         }
     } catch (err) {
         console.error('Failed to load users:', err);
@@ -314,7 +322,7 @@ function initMfaModal() {
                 updateConfidenceDisplay(0.88, 'LOW', 'allowed');
                 alert('Session successfully verified and unlocked! Seamless monitoring resumed.');
             } else {
-                alert(data.error || 'Invalid verification OTP. Access denied.');
+                alert(data.message || data.error || 'Invalid verification OTP. Access denied.');
             }
         } catch (e) {
             alert('Verification request failed. Check server connection.');

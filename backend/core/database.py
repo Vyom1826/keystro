@@ -7,6 +7,7 @@ import sqlite3
 import os
 import json
 import random
+import secrets
 from datetime import datetime, timezone
 
 # Persist to keystro.db in the project root
@@ -91,6 +92,12 @@ def init_db():
         features_json TEXT NOT NULL
     );
     """)
+
+    # Performance indexes for session & user lookups
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_verification_logs_session_id ON verification_logs(session_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_verification_logs_username ON verification_logs(username);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_enrollment_samples_username ON enrollment_samples(username);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username);")
 
     # Dynamic migrations for Continuous Online Adaptation ("Train Ahead")
     cursor.execute("PRAGMA table_info(users)")
@@ -256,10 +263,10 @@ def update_session_evaluation(session_id, score, risk_level, is_anomaly, action_
     challenge_otp = None
     challenge_created_at = None
 
-    if action_taken == "locked" and curr["status"] != "locked":
+    if action_taken == "locked" and curr["status"] not in ("challenged", "locked"):
         new_status = "challenged"
-        # Generate 6-digit OTP
-        challenge_otp = f"{random.randint(100000, 999999)}"
+        # Generate cryptographically secure 6-digit OTP
+        challenge_otp = f"{secrets.randbelow(900000) + 100000}"
         challenge_created_at = now
 
     if challenge_otp:

@@ -171,10 +171,7 @@ function initImposterControls() {
                 const samples = data.baseline?.sample_count ?? data.sample_count ?? '';
                 alert(`✅ Model successfully retrained for ${State.currentUser}!\nBaseline: Dwell ${dwell}ms, Flight ${flight}ms (${samples} training samples).`);
                 if (typeof loadUsers === 'function') {
-                    await loadUsers();
-                }
-                if (typeof selectUser === 'function') {
-                    selectUser(State.currentUser);
+                    await loadUsers(State.currentUser);
                 }
             } else {
                 alert(`Retrain failed: ${data.error || 'Unknown error'}`);

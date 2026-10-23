@@ -17,9 +17,15 @@ logger = logging.getLogger("KeyStro.Session")
 
 # In-memory continuous learning session buffers
 _SESSION_BUFFERS = {}
+_MAX_SESSION_BUFFERS = 500
+_MAX_GENUINE_EVENTS = 2000
 
 def get_session_buffer(session_id: str, username: str) -> dict:
     if session_id not in _SESSION_BUFFERS:
+        if len(_SESSION_BUFFERS) >= _MAX_SESSION_BUFFERS:
+            # Prune oldest 100 sessions to prevent unbounded memory growth
+            for k in list(_SESSION_BUFFERS.keys())[:100]:
+                _SESSION_BUFFERS.pop(k, None)
         user = db.get_user(username) or {}
         _SESSION_BUFFERS[session_id] = {
             "genuine_events": [],
@@ -196,6 +202,8 @@ def verify_session():
                 words_in_chunk = max(1, round(len(events) / 5.0))
 
             buffer["genuine_events"].extend(events)
+            if len(buffer["genuine_events"]) > _MAX_GENUINE_EVENTS:
+                buffer["genuine_events"] = buffer["genuine_events"][-_MAX_GENUINE_EVENTS:]
             buffer["accumulated_words"] += words_in_chunk
 
             ADAPTATION_WORD_THRESHOLD = 200

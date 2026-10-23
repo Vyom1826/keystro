@@ -356,9 +356,7 @@ async function completeEnrollment(username) {
             }
 
             // Reload user dropdown and switch to newly enrolled user
-            await loadUsers();
-            document.getElementById('userSelect').value = username;
-            startSession(username);
+            await loadUsers(username);
 
             document.getElementById('enrollSubmitPassageBtn').textContent = 'Enrollment Complete';
         } else {

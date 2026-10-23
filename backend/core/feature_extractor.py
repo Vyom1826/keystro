@@ -64,7 +64,7 @@ def parse_raw_keystrokes(events: List[Any]) -> Tuple[np.ndarray, np.ndarray, np.
             if "latency" in item and item["latency"] is not None:
                 ikl_list.append(float(item["latency"]))
         if not flight_list:
-            flight_list = [max(10.0, ikl - d) for d, ikl in zip(dwell_list[1:], ikl_list)]
+            flight_list = [max(10.0, ikl - d) for d, ikl in zip(dwell_list[:-1], ikl_list)]
         if not ikl_list:
             ikl_list = [d + f for d, f in zip(dwell_list[:-1], flight_list)]
         total_duration = float(sum(ikl_list)) if ikl_list else 1000.0
