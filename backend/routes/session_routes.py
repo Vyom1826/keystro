@@ -12,6 +12,7 @@ from flask import request, jsonify
 from routes import session_bp
 import core.database as db
 import core.model_pipeline as mp
+import core.notifier as notifier
 
 logger = logging.getLogger("KeyStro.Session")
 
@@ -256,6 +257,17 @@ def verify_session():
             action_taken=action_taken,
             is_imposter=is_imposter
         )
+
+        # Dispatch real-time SMS / Email alerts if risk level is elevated (MEDIUM / HIGH)
+        if risk_level in ("MEDIUM", "HIGH"):
+            notifier.trigger_risk_alert(
+                username=username,
+                session_id=session_id,
+                risk_level=risk_level,
+                score=score,
+                status_message=status_message,
+                features=eval_result["features"]
+            )
 
         response_payload = {
             "success": True,

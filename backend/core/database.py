@@ -99,6 +99,50 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_enrollment_samples_username ON enrollment_samples(username);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username);")
 
+    # Alert notification settings and dispatch audit logs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS alert_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        email_enabled INTEGER DEFAULT 1,
+        alert_email TEXT DEFAULT '',
+        smtp_host TEXT DEFAULT 'smtp.gmail.com',
+        smtp_port INTEGER DEFAULT 587,
+        smtp_user TEXT DEFAULT '',
+        smtp_pass TEXT DEFAULT '',
+        sms_enabled INTEGER DEFAULT 1,
+        alert_phone TEXT DEFAULT '',
+        twilio_sid TEXT DEFAULT '',
+        twilio_token TEXT DEFAULT '',
+        twilio_from TEXT DEFAULT '',
+        min_risk_level TEXT DEFAULT 'MEDIUM',
+        cooldown_seconds INTEGER DEFAULT 60,
+        updated_at TEXT
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS alert_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        username TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        risk_level TEXT NOT NULL,
+        score REAL NOT NULL,
+        channel TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        status TEXT NOT NULL,
+        message TEXT NOT NULL
+    );
+    """)
+
+    # Initialize default settings row if not present
+    cursor.execute("SELECT COUNT(*) FROM alert_settings WHERE id = 1")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO alert_settings (id, email_enabled, alert_email, sms_enabled, alert_phone, min_risk_level, cooldown_seconds, updated_at)
+            VALUES (1, 1, '', 1, '', 'MEDIUM', 60, ?)
+        """, (datetime.now(timezone.utc).isoformat(),))
+
     # Dynamic migrations for Continuous Online Adaptation ("Train Ahead")
     cursor.execute("PRAGMA table_info(users)")
     existing_user_cols = [col[1] for col in cursor.fetchall()]
@@ -457,3 +501,89 @@ def reset_database():
     cursor.execute("DELETE FROM users")
     conn.commit()
     conn.close()
+
+
+def get_alert_settings():
+    """Retrieves current notification settings, creating defaults if not yet initialized."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM alert_settings WHERE id = 1")
+    row = cursor.fetchone()
+    if not row:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor.execute("""
+            INSERT INTO alert_settings (id, email_enabled, alert_email, sms_enabled, alert_phone, min_risk_level, cooldown_seconds, updated_at)
+            VALUES (1, 1, '', 1, '', 'MEDIUM', 60, ?)
+        """, (now,))
+        conn.commit()
+        cursor.execute("SELECT * FROM alert_settings WHERE id = 1")
+        row = cursor.fetchone()
+    res = dict(row)
+    conn.close()
+    return res
+
+
+def update_alert_settings(settings: dict):
+    """Updates the alert configuration row."""
+    conn = get_db()
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute("""
+        UPDATE alert_settings
+        SET email_enabled = ?,
+            alert_email = ?,
+            smtp_host = ?,
+            smtp_port = ?,
+            smtp_user = ?,
+            smtp_pass = ?,
+            sms_enabled = ?,
+            alert_phone = ?,
+            twilio_sid = ?,
+            twilio_token = ?,
+            twilio_from = ?,
+            min_risk_level = ?,
+            cooldown_seconds = ?,
+            updated_at = ?
+        WHERE id = 1
+    """, (
+        int(settings.get("email_enabled", 1)),
+        str(settings.get("alert_email", "")).strip(),
+        str(settings.get("smtp_host", "smtp.gmail.com")).strip(),
+        int(settings.get("smtp_port", 587)),
+        str(settings.get("smtp_user", "")).strip(),
+        str(settings.get("smtp_pass", "")).strip(),
+        int(settings.get("sms_enabled", 1)),
+        str(settings.get("alert_phone", "")).strip(),
+        str(settings.get("twilio_sid", "")).strip(),
+        str(settings.get("twilio_token", "")).strip(),
+        str(settings.get("twilio_from", "")).strip(),
+        str(settings.get("min_risk_level", "MEDIUM")).strip().upper(),
+        int(settings.get("cooldown_seconds", 60)),
+        now
+    ))
+    conn.commit()
+    conn.close()
+    return get_alert_settings()
+
+
+def log_alert(username, session_id, risk_level, score, channel, recipient, status, message):
+    """Records an emitted email or SMS alert into the audit table."""
+    conn = get_db()
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    cursor.execute("""
+        INSERT INTO alert_logs (timestamp, username, session_id, risk_level, score, channel, recipient, status, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (now, username, session_id, risk_level, float(score), channel, recipient, status, message))
+    conn.commit()
+    conn.close()
+
+
+def get_alert_logs(limit=20):
+    """Fetches most recent alert logs for the UI modal audit feed."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM alert_logs ORDER BY id DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

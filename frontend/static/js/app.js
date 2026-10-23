@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEnrollmentFlow();
     initImposterControls();
     initMfaModal();
+    initAlertSettingsModal();
     initResetButton();
 
     // Fetch enrolled users and start initial session
@@ -336,6 +337,244 @@ function initMfaModal() {
             startSession(State.currentUser);
         }
     });
+}
+
+// -------------------------------------------------------------
+// Real-Time Risk Notification & Alert Settings Handler
+// -------------------------------------------------------------
+function initAlertSettingsModal() {
+    const modal = document.getElementById('alertSettingsModal');
+    const openBtn = document.getElementById('openAlertSettingsBtn');
+    const closeBtn = document.getElementById('closeAlertSettingsBtn');
+    const closeXBtn = document.getElementById('closeAlertModalBtn');
+    const saveBtn = document.getElementById('saveAlertSettingsBtn');
+    const testBtn = document.getElementById('sendTestAlertBtn');
+    const refreshLogsBtn = document.getElementById('refreshAlertLogsBtn');
+    const statusBanner = document.getElementById('alertSettingsStatus');
+    const activeBadge = document.getElementById('alertActiveBadge');
+
+    if (!modal) return;
+
+    // Load settings from backend
+    async function fetchAlertSettings() {
+        try {
+            const res = await fetch('/api/alerts/settings');
+            const data = await res.json();
+            if (data.success && data.settings) {
+                const s = data.settings;
+                const minRiskEl = document.getElementById('settingsMinRisk');
+                const cooldownEl = document.getElementById('settingsCooldown');
+                const emailEnabledEl = document.getElementById('settingsEmailEnabled');
+                const alertEmailEl = document.getElementById('settingsAlertEmail');
+                const smtpHostEl = document.getElementById('settingsSmtpHost');
+                const smtpPortEl = document.getElementById('settingsSmtpPort');
+                const smtpUserEl = document.getElementById('settingsSmtpUser');
+                const smtpPassEl = document.getElementById('settingsSmtpPass');
+
+                const smsEnabledEl = document.getElementById('settingsSmsEnabled');
+                const alertPhoneEl = document.getElementById('settingsAlertPhone');
+                const twilioSidEl = document.getElementById('settingsTwilioSid');
+                const twilioTokenEl = document.getElementById('settingsTwilioToken');
+                const twilioFromEl = document.getElementById('settingsTwilioFrom');
+
+                if (minRiskEl) minRiskEl.value = s.min_risk_level || 'MEDIUM';
+                if (cooldownEl) cooldownEl.value = s.cooldown_seconds || 60;
+                if (emailEnabledEl) emailEnabledEl.checked = Boolean(s.email_enabled);
+                if (alertEmailEl) alertEmailEl.value = s.alert_email || '';
+                if (smtpHostEl) smtpHostEl.value = s.smtp_host || 'smtp.gmail.com';
+                if (smtpPortEl) smtpPortEl.value = s.smtp_port || 587;
+                if (smtpUserEl) smtpUserEl.value = s.smtp_user || '';
+                if (smtpPassEl) smtpPassEl.value = s.smtp_pass || '';
+
+                if (smsEnabledEl) smsEnabledEl.checked = Boolean(s.sms_enabled);
+                if (alertPhoneEl) alertPhoneEl.value = s.alert_phone || '';
+                if (twilioSidEl) twilioSidEl.value = s.twilio_sid || '';
+                if (twilioTokenEl) twilioTokenEl.value = s.twilio_token || '';
+                if (twilioFromEl) twilioFromEl.value = s.twilio_from || '';
+
+                if (activeBadge) {
+                    const isConfigured = (s.email_enabled && s.alert_email) || (s.sms_enabled && s.alert_phone);
+                    activeBadge.style.background = isConfigured ? '#10b981' : '#f59e0b';
+                    activeBadge.title = isConfigured ? 'Alert notifications active' : 'Alert destinations not configured';
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load alert settings:', e);
+        }
+    }
+
+    // Load recent alert logs
+    async function fetchAlertLogs() {
+        const feed = document.getElementById('recentAlertsFeed');
+        if (!feed) return;
+        try {
+            const res = await fetch('/api/alerts/logs');
+            const data = await res.json();
+            if (data.success && data.logs) {
+                if (data.logs.length === 0) {
+                    feed.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 0.5rem;">No alerts dispatched yet.</div>';
+                    return;
+                }
+                feed.innerHTML = data.logs.map((log) => {
+                    const timeStr = log.timestamp ? log.timestamp.split('T')[1].split('.')[0] : '--:--:--';
+                    const icon = log.channel === 'sms' ? '📱' : '📧';
+                    let statusColor = '#10b981';
+                    if (log.status === 'simulated') statusColor = '#3b82f6';
+                    if (log.status === 'failed') statusColor = '#ef4444';
+
+                    return `
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding: 0.3rem 0;">
+                            <div>
+                                <span style="margin-right: 0.3rem;">${icon}</span>
+                                <strong>[${log.risk_level}]</strong>
+                                <span style="color: var(--text-primary); margin-left: 0.2rem;">${log.recipient}</span>
+                                <span style="color: var(--text-muted); font-size: 0.7rem; margin-left: 0.3rem;">(${log.username})</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="background: ${statusColor}15; color: ${statusColor}; border: 1px solid ${statusColor}40; border-radius: 3px; padding: 0.1rem 0.4rem; font-weight: 600; font-size: 0.65rem; text-transform: uppercase;">${log.status}</span>
+                                <span style="color: var(--text-muted); font-size: 0.65rem;">${timeStr}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load alert logs:', e);
+        }
+    }
+
+    // Open Modal
+    openBtn?.addEventListener('click', async () => {
+        modal.classList.add('active');
+        if (statusBanner) statusBanner.style.display = 'none';
+        await fetchAlertSettings();
+        await fetchAlertLogs();
+    });
+
+    // Close Modal
+    function closeModal() {
+        modal.classList.remove('active');
+    }
+    closeBtn?.addEventListener('click', closeModal);
+    closeXBtn?.addEventListener('click', closeModal);
+
+    // Save Settings
+    saveBtn?.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        try {
+            const payload = {
+                min_risk_level: document.getElementById('settingsMinRisk')?.value || 'MEDIUM',
+                cooldown_seconds: parseInt(document.getElementById('settingsCooldown')?.value || '60', 10),
+                email_enabled: document.getElementById('settingsEmailEnabled')?.checked ? 1 : 0,
+                alert_email: document.getElementById('settingsAlertEmail')?.value.trim() || '',
+                smtp_host: document.getElementById('settingsSmtpHost')?.value.trim() || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('settingsSmtpPort')?.value || '587', 10),
+                smtp_user: document.getElementById('settingsSmtpUser')?.value.trim() || '',
+                smtp_pass: document.getElementById('settingsSmtpPass')?.value.trim() || '',
+                sms_enabled: document.getElementById('settingsSmsEnabled')?.checked ? 1 : 0,
+                alert_phone: document.getElementById('settingsAlertPhone')?.value.trim() || '',
+                twilio_sid: document.getElementById('settingsTwilioSid')?.value.trim() || '',
+                twilio_token: document.getElementById('settingsTwilioToken')?.value.trim() || '',
+                twilio_from: document.getElementById('settingsTwilioFrom')?.value.trim() || ''
+            };
+
+            const res = await fetch('/api/alerts/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (statusBanner) {
+                    statusBanner.style.display = 'block';
+                    statusBanner.style.background = '#ecfdf5';
+                    statusBanner.style.color = '#065f46';
+                    statusBanner.style.border = '1px solid #a7f3d0';
+                    statusBanner.textContent = '✅ Alert settings successfully saved!';
+                }
+                await fetchAlertSettings();
+            } else if (statusBanner) {
+                statusBanner.style.display = 'block';
+                statusBanner.style.background = '#fef2f2';
+                statusBanner.style.color = '#991b1b';
+                statusBanner.style.border = '1px solid #fecaca';
+                statusBanner.textContent = `Error: ${data.message || 'Failed to save settings'}`;
+            }
+        } catch (e) {
+            if (statusBanner) {
+                statusBanner.style.display = 'block';
+                statusBanner.style.background = '#fef2f2';
+                statusBanner.style.color = '#991b1b';
+                statusBanner.style.border = '1px solid #fecaca';
+                statusBanner.textContent = 'Network error saving settings.';
+            }
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Settings';
+        }
+    });
+
+    // Send Test Alert
+    testBtn?.addEventListener('click', async () => {
+        testBtn.disabled = true;
+        testBtn.textContent = '⚡ Dispatching Test...';
+        if (statusBanner) {
+            statusBanner.style.display = 'block';
+            statusBanner.style.background = '#eff6ff';
+            statusBanner.style.color = '#1e40af';
+            statusBanner.style.border = '1px solid #bfdbfe';
+            statusBanner.textContent = 'Transmitting test alerts across configured channels...';
+        }
+
+        try {
+            const payload = {
+                email_enabled: document.getElementById('settingsEmailEnabled')?.checked ? 1 : 0,
+                alert_email: document.getElementById('settingsAlertEmail')?.value.trim() || '',
+                smtp_host: document.getElementById('settingsSmtpHost')?.value.trim() || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('settingsSmtpPort')?.value || '587', 10),
+                smtp_user: document.getElementById('settingsSmtpUser')?.value.trim() || '',
+                smtp_pass: document.getElementById('settingsSmtpPass')?.value.trim() || '',
+                sms_enabled: document.getElementById('settingsSmsEnabled')?.checked ? 1 : 0,
+                alert_phone: document.getElementById('settingsAlertPhone')?.value.trim() || '',
+                twilio_sid: document.getElementById('settingsTwilioSid')?.value.trim() || '',
+                twilio_token: document.getElementById('settingsTwilioToken')?.value.trim() || '',
+                twilio_from: document.getElementById('settingsTwilioFrom')?.value.trim() || ''
+            };
+
+            const res = await fetch('/api/alerts/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success && data.results) {
+                const emMsg = data.results.email?.message || 'Email: Skipped';
+                const smsMsg = data.results.sms?.message || 'SMS: Skipped';
+                if (statusBanner) {
+                    statusBanner.style.background = '#f0fdf4';
+                    statusBanner.style.color = '#166534';
+                    statusBanner.style.border = '1px solid #bbf7d0';
+                    statusBanner.innerHTML = `<strong>Test Alerts Dispatched:</strong><br>📧 ${emMsg}<br>📱 ${smsMsg}`;
+                }
+                await fetchAlertLogs();
+            } else if (statusBanner) {
+                statusBanner.textContent = `Test failed: ${data.message || 'Unknown error'}`;
+            }
+        } catch (e) {
+            if (statusBanner) {
+                statusBanner.textContent = 'Server communication error testing alerts.';
+            }
+        } finally {
+            testBtn.disabled = false;
+            testBtn.textContent = '⚡ Send Test Alert (SMS & Email)';
+        }
+    });
+
+    refreshLogsBtn?.addEventListener('click', fetchAlertLogs);
+
+    // Initial silent check on page load to set badge color
+    fetchAlertSettings();
 }
 
 // -------------------------------------------------------------
