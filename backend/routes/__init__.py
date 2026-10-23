@@ -9,3 +9,4 @@ enroll_bp = Blueprint("enroll", __name__)
 analytics_bp = Blueprint("analytics", __name__)
 
 from routes import session_routes, enroll_routes, analytics_routes
+from routes.auth_routes import auth_bp

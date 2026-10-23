@@ -8,6 +8,7 @@ import os
 import json
 import random
 import secrets
+import hashlib
 from datetime import datetime, timezone
 
 # Persist to keystro.db in the project root
@@ -152,6 +153,14 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN adaptation_count INTEGER DEFAULT 0")
     if "words_adapted" not in existing_user_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN words_adapted INTEGER DEFAULT 0")
+    if "full_name" not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN full_name TEXT DEFAULT ''")
+    if "email" not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
+    if "phone" not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''")
+    if "password_hash" not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
 
     cursor.execute("PRAGMA table_info(sessions)")
     existing_session_cols = [col[1] for col in cursor.fetchall()]
@@ -215,7 +224,7 @@ def list_users():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT username, created_at, total_samples, avg_dwell, avg_flight, avg_speed, status,
+        SELECT username, full_name, email, phone, created_at, total_samples, avg_dwell, avg_flight, avg_speed, status,
                COALESCE(model_version, 'v1.0') as model_version,
                COALESCE(adaptation_count, 0) as adaptation_count,
                COALESCE(words_adapted, 0) as words_adapted
@@ -225,6 +234,122 @@ def list_users():
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def hash_password(password: str) -> str:
+    """Computes SHA-256 password hash with salt."""
+    salt = "keystro_secure_salt_2026"
+    return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+
+
+def register_user(username: str, full_name: str, email: str, phone: str, password: str) -> dict:
+    """
+    Registers a new user account with personal details.
+    Initial status is 'pending_enrollment' until typing calibration passages are completed.
+    Also links email and phone to alert settings.
+    """
+    username = (username or "").strip()
+    full_name = (full_name or "").strip()
+    email = (email or "").strip()
+    phone = (phone or "").strip()
+    password = (password or "").strip()
+
+    if not username:
+        return {"success": False, "error": "Username is required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Check if username exists with a password already
+    cursor.execute("SELECT username, password_hash, status FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    existing = cursor.fetchone()
+    if existing and existing["password_hash"]:
+        conn.close()
+        return {"success": False, "error": f"Username '{username}' is already registered. Please sign in."}
+
+    pwd_hash = hash_password(password) if password else ""
+    now = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        cursor.execute("""
+            UPDATE users
+            SET full_name = ?,
+                email = ?,
+                phone = ?,
+                password_hash = ?,
+                status = CASE WHEN status = 'enrolled' THEN 'enrolled' ELSE 'pending_enrollment' END
+            WHERE LOWER(username) = LOWER(?)
+        """, (full_name, email, phone, pwd_hash, username))
+    else:
+        cursor.execute("""
+            INSERT INTO users (username, full_name, email, phone, password_hash, created_at, status, model_version, total_samples)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending_enrollment', 'v1.0', 0)
+        """, (username, full_name, email, phone, pwd_hash, now))
+
+    conn.commit()
+
+    # Auto-link alert preferences if email/phone provided
+    if email or phone:
+        cursor.execute("SELECT alert_email, alert_phone FROM alert_settings WHERE id = 1")
+        curr_alert = cursor.fetchone()
+        new_email = email or (curr_alert["alert_email"] if curr_alert else "")
+        new_phone = phone or (curr_alert["alert_phone"] if curr_alert else "")
+        cursor.execute("""
+            UPDATE alert_settings
+            SET alert_email = ?,
+                alert_phone = ?,
+                updated_at = ?
+            WHERE id = 1
+        """, (new_email, new_phone, now))
+        conn.commit()
+
+    cursor.execute("SELECT id, username, full_name, email, phone, status, total_samples FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    user_row = dict(cursor.fetchone())
+    conn.close()
+
+    return {"success": True, "user": user_row}
+
+
+def authenticate_user(identifier: str, password: str) -> dict:
+    """
+    Authenticates a user via username or email.
+    Returns user record if valid, or error dictionary.
+    """
+    identifier = (identifier or "").strip()
+    password = (password or "").strip()
+
+    if not identifier:
+        return {"success": False, "error": "Username or Email is required."}
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, username, full_name, email, phone, status, total_samples,
+               avg_dwell, avg_flight, avg_speed, model_version, password_hash
+        FROM users 
+        WHERE LOWER(username) = LOWER(?) OR (email != '' AND LOWER(email) = LOWER(?))
+    """, (identifier, identifier))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return {"success": False, "error": f"User '{identifier}' not found. Please sign up first."}
+
+    user = dict(row)
+    pwd_hash = user.pop("password_hash", "")
+
+    # If user has a password set, verify hash
+    if pwd_hash:
+        expected_hash = hash_password(password)
+        if pwd_hash != expected_hash:
+            return {"success": False, "error": "Incorrect password. Please try again."}
+
+    is_enrolled = (user.get("status") == "enrolled" and user.get("total_samples", 0) > 0)
+    return {
+        "success": True,
+        "user": user,
+        "is_enrolled": is_enrolled
+    }
 
 
 def save_enrollment_sample(username, sample_index, raw_timings, features):

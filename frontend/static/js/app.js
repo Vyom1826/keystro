@@ -24,6 +24,7 @@ const State = {
 // DOM Content Loaded Handler: Initializes all subsystems in order
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initAuthPortal();
     initTelemetryChart();
     initWorkspaceRecorder();
     initEnrollmentFlow();
@@ -35,6 +36,244 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch enrolled users and start initial session
     loadUsers();
 });
+
+// -------------------------------------------------------------
+// Authentication & User Onboarding Portal System
+// -------------------------------------------------------------
+function initAuthPortal() {
+    const modal = document.getElementById('authWelcomeModal');
+    const openBtn = document.getElementById('openAuthModalBtn');
+    const skipBtn = document.getElementById('skipAuthBtn');
+    const tabSignIn = document.getElementById('authTabSignIn');
+    const tabSignUp = document.getElementById('authTabSignUp');
+    const formSignIn = document.getElementById('authSignInForm');
+    const formSignUp = document.getElementById('authSignUpForm');
+    const banner = document.getElementById('authStatusBanner');
+    const navAuthLabel = document.getElementById('navAuthLabel');
+    const submitLoginBtn = document.getElementById('submitLoginBtn');
+    const submitRegisterBtn = document.getElementById('submitRegisterBtn');
+
+    if (!modal) return;
+
+    // Check if user was previously authenticated in localStorage
+    const savedAuth = localStorage.getItem('keystro_auth_user');
+    if (savedAuth) {
+        try {
+            const user = JSON.parse(savedAuth);
+            State.authenticatedUser = user;
+            if (navAuthLabel) {
+                navAuthLabel.textContent = user.full_name ? `${user.full_name.split(' ')[0]}` : user.username;
+            }
+            modal.classList.remove('active');
+        } catch (e) {
+            localStorage.removeItem('keystro_auth_user');
+        }
+    }
+
+    function showBanner(msg, isSuccess = false) {
+        if (!banner) return;
+        banner.style.display = 'block';
+        banner.style.background = isSuccess ? '#ecfdf5' : '#fef2f2';
+        banner.style.color = isSuccess ? '#065f46' : '#991b1b';
+        banner.style.border = `1px solid ${isSuccess ? '#a7f3d0' : '#fecaca'}`;
+        banner.textContent = msg;
+    }
+
+    // Toggle Tabs
+    tabSignIn?.addEventListener('click', () => {
+        tabSignIn.classList.add('active');
+        tabSignIn.style.background = '#ffffff';
+        tabSignIn.style.color = 'var(--text-primary)';
+        tabSignIn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+        tabSignUp.classList.remove('active');
+        tabSignUp.style.background = 'transparent';
+        tabSignUp.style.color = 'var(--text-secondary)';
+        tabSignUp.style.boxShadow = 'none';
+
+        if (formSignIn) formSignIn.style.display = 'block';
+        if (formSignUp) formSignUp.style.display = 'none';
+        if (banner) banner.style.display = 'none';
+    });
+
+    tabSignUp?.addEventListener('click', () => {
+        tabSignUp.classList.add('active');
+        tabSignUp.style.background = '#ffffff';
+        tabSignUp.style.color = 'var(--text-primary)';
+        tabSignUp.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+        tabSignIn.classList.remove('active');
+        tabSignIn.style.background = 'transparent';
+        tabSignIn.style.color = 'var(--text-secondary)';
+        tabSignIn.style.boxShadow = 'none';
+
+        if (formSignUp) formSignUp.style.display = 'block';
+        if (formSignIn) formSignIn.style.display = 'none';
+        if (banner) banner.style.display = 'none';
+    });
+
+    // Open/Close
+    openBtn?.addEventListener('click', () => {
+        modal.classList.add('active');
+        if (banner) banner.style.display = 'none';
+    });
+
+    skipBtn?.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    // Handle Login Submit
+    submitLoginBtn?.addEventListener('click', async () => {
+        const identifier = document.getElementById('loginIdentifier')?.value.trim();
+        const password = document.getElementById('loginPassword')?.value;
+
+        if (!identifier) {
+            showBanner('Please enter your username or email.');
+            return;
+        }
+
+        submitLoginBtn.disabled = true;
+        submitLoginBtn.textContent = 'Verifying...';
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier, password })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                State.authenticatedUser = data.user;
+                localStorage.setItem('keystro_auth_user', JSON.stringify(data.user));
+
+                if (navAuthLabel) {
+                    navAuthLabel.textContent = data.user.full_name ? data.user.full_name.split(' ')[0] : data.user.username;
+                }
+
+                modal.classList.remove('active');
+
+                if (data.is_enrolled) {
+                    // Switch to Workspace
+                    document.querySelector('.tab-btn[data-tab="workspacePane"]')?.click();
+                    await loadUsers(data.user.username);
+                } else {
+                    // Navigate to Enrollment Pane for Calibration
+                    document.querySelector('.tab-btn[data-tab="enrollmentPane"]')?.click();
+                    const enrollUserEl = document.getElementById('enrollUsername');
+                    if (enrollUserEl) enrollUserEl.value = data.user.username;
+                    alert(`Welcome, ${data.user.full_name || data.user.username}! Please complete your 3 typing calibration passages to activate your keystroke profile.`);
+                }
+            } else {
+                showBanner(data.error || 'Authentication failed. Please verify credentials.');
+            }
+        } catch (e) {
+            showBanner('Server communication error during login.');
+        } finally {
+            submitLoginBtn.disabled = false;
+            submitLoginBtn.textContent = 'Sign In to Active Workspace →';
+        }
+    });
+
+    // Handle Registration Submit -> Navigate directly to User Enrollment
+    submitRegisterBtn?.addEventListener('click', async () => {
+        const fullName = document.getElementById('regFullName')?.value.trim();
+        const username = document.getElementById('regUsername')?.value.trim();
+        const email = document.getElementById('regEmail')?.value.trim();
+        const phone = document.getElementById('regPhone')?.value.trim();
+        const password = document.getElementById('regPassword')?.value;
+
+        if (!fullName) {
+            showBanner('Please enter your full name.');
+            return;
+        }
+        if (!username) {
+            showBanner('Please choose a username.');
+            return;
+        }
+        if (!email) {
+            showBanner('Please enter your email address.');
+            return;
+        }
+        if (!phone) {
+            showBanner('Please enter your phone number.');
+            return;
+        }
+        if (!password) {
+            showBanner('Please create a password.');
+            return;
+        }
+
+        submitRegisterBtn.disabled = true;
+        submitRegisterBtn.textContent = 'Creating Profile & Preparing Enrollment...';
+
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    full_name: fullName,
+                    username,
+                    email,
+                    phone,
+                    password
+                })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                State.authenticatedUser = data.user;
+                localStorage.setItem('keystro_auth_user', JSON.stringify(data.user));
+
+                if (navAuthLabel) {
+                    navAuthLabel.textContent = fullName.split(' ')[0] || username;
+                }
+
+                // Close welcome portal
+                modal.classList.remove('active');
+
+                // Switch to the Biometric Enrollment Tab
+                document.querySelector('.tab-btn[data-tab="enrollmentPane"]')?.click();
+
+                // Pre-populate username field in enrollment tab
+                const enrollUserEl = document.getElementById('enrollUsername');
+                if (enrollUserEl) {
+                    enrollUserEl.value = username;
+                    enrollUserEl.disabled = true; // Lock to current signed up user
+                }
+
+                // Show welcome prompt to begin calibration
+                const enrollmentInput = document.getElementById('enrollmentInput');
+                if (enrollmentInput) {
+                    enrollmentInput.focus();
+                }
+
+                alert(`🎉 Account created for ${fullName}!\n\nYour profile is now ready. Please type the 3 calibration passages below to enroll your unique typing cadence!`);
+            } else {
+                showBanner(data.error || 'Failed to create account.');
+            }
+        } catch (e) {
+            showBanner('Server communication error during registration.');
+        } finally {
+            submitRegisterBtn.disabled = false;
+            submitRegisterBtn.textContent = 'Create Account & Proceed to Biometric Enrollment →';
+        }
+    });
+
+    // Quick demo 1-click logins
+    document.querySelectorAll('.demo-quick-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const user = btn.getAttribute('data-user');
+            if (user) {
+                const idEl = document.getElementById('loginIdentifier');
+                const pwdEl = document.getElementById('loginPassword');
+                if (idEl) idEl.value = user;
+                if (pwdEl) pwdEl.value = 'demo123';
+                submitLoginBtn.click();
+            }
+        });
+    });
+}
 
 // -------------------------------------------------------------
 // Tab Switching System

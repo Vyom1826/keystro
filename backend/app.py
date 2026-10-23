@@ -19,7 +19,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 import core.database as db
-from routes import session_bp, enroll_bp, analytics_bp
+from routes import session_bp, enroll_bp, analytics_bp, auth_bp
 
 # Configure paths for Frontend
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
@@ -61,6 +61,7 @@ def create_app():
     app.register_blueprint(session_bp)
     app.register_blueprint(enroll_bp)
     app.register_blueprint(analytics_bp)
+    app.register_blueprint(auth_bp)
 
     # Main Dashboard Route
     @app.route("/")
