@@ -10,7 +10,8 @@ import random
 from datetime import datetime, timezone
 
 # Persist to keystro.db in the project root
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 DB_FILE = os.path.join(ROOT_DIR, "keystro.db")
 
 

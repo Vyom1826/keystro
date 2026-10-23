@@ -4,13 +4,20 @@ Tests all REST API endpoints, biometric ML models, adaptive session locking,
 and simulated MFA challenge response.
 """
 
+import os
+import sys
 import unittest
 import json
 import numpy as np
+
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 from app import app
-import database as db
-import model_pipeline as mp
-import feature_extractor as fe
+import core.database as db
+import core.model_pipeline as mp
+import core.feature_extractor as fe
 
 
 class KeyStroTestSuite(unittest.TestCase):

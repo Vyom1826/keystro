@@ -77,42 +77,48 @@ KeyStro employs a **dual-mode hybrid strategy** combining unsupervised anomaly d
 
 ---
 
-## 📁 Clean Modular Project Structure
+## 📁 Clean Architecture & Structure
 
 ```
 keystro/
-├── app.py                      # Clean application factory and server entry point
-├── requirements.txt            # Production Python dependencies
-├── README.md                   # System documentation & setup guide
-├── seed_data.py                # Pre-populates Alice, Bob, Charlie profiles & demo telemetry
-├── test_suite.py               # Comprehensive 8-stage automated test suite
-├── keystro.db                  # Local SQLite database
+├── frontend/                      # 🎨 Complete Frontend Application
+│   ├── static/
+│   │   ├── css/
+│   │   │   └── style.css          # Cybersecurity dashboard styling & HUD gauges
+│   │   └── js/
+│   │       ├── app.js             # Application coordinator & session lifecycle
+│   │       ├── enrollment.js      # 3-step biometric calibration & typo detection
+│   │       ├── keystroke_recorder.js # High-resolution timing recorder engine
+│   │       ├── prompts.js         # Dynamic prompt banks
+│   │       ├── telemetry.js       # Live telemetry HUD & Chart.js stream
+│   │       └── workspace.js       # Active monitored sandbox & imposter injector
+│   └── templates/
+│       └── index.html             # Single-page Security Operations Center UI
 │
-├── core/                       # Core ML & Persistence Modules
-│   ├── __init__.py
-│   ├── database.py             # SQLite persistence for profiles, sessions, and audit logs
-│   ├── feature_extractor.py    # Extracts 22 statistical timing features (dwell, flight, ikl)
-│   └── model_pipeline.py       # Dual-mode AI models (IsolationForest + RandomForest)
+├── backend/                       # 🧠 Complete Backend API & ML Services
+│   ├── app.py                     # Flask application factory & blueprint registration
+│   ├── seed_data.py               # Pre-populates synthetic baseline profiles
+│   ├── test_suite.py              # Automated 11-stage verification suite
+│   ├── core/                      # Core biometric engine & persistence
+│   │   ├── database.py            # SQLite schema, sessions, and telemetry persistence
+│   │   ├── feature_extractor.py   # Extracts 22-dimensional timing dynamics vectors
+│   │   └── model_pipeline.py      # Dual-mode IsolationForest + RandomForest pipeline
+│   └── routes/                    # Modular REST API Blueprints
+│       ├── session_routes.py      # /api/start-session, /api/verify-session, /api/verify-otp
+│       ├── enroll_routes.py       # /api/enroll, /api/users
+│       └── analytics_routes.py    # /api/metrics, /api/health
 │
-├── routes/                     # Modular Flask REST API Blueprints
-│   ├── __init__.py
-│   ├── session_routes.py       # /api/start-session, /api/verify-session, /api/verify-otp
-│   ├── enroll_routes.py        # /api/enroll, /api/users
-│   └── analytics_routes.py     # /api/metrics, /api/reset, /api/health
+├── models/                        # 📦 Trained Biometric Machine Learning Bundles
+│   ├── Vyom Singhal_model.joblib  # User profile model bundles (.joblib)
+│   ├── alice_swift_model.joblib
+│   ├── bob_deliberate_model.joblib
+│   ├── charlie_analyst_model.joblib
+│   └── ...
 │
-├── static/
-│   ├── css/
-│   │   └── style.css           # High-tech cybersecurity dark UI with neon HUD
-│   └── js/
-│       ├── keystroke_recorder.js # Client-side privacy-first timing capture engine
-│       ├── prompts.js          # Random cybersecurity typing prompts bank
-│       ├── telemetry.js        # Real-time Chart.js telemetry stream & circular SVG gauge
-│       ├── workspace.js        # Monitored editor sandbox & imposter attack simulator
-│       ├── enrollment.js       # 3-step calibration flow with char-by-char typo detection
-│       └── app.js              # Application coordinator & session lifecycle manager
-│
-└── templates/
-    └── index.html              # Responsive Security Operations Center dashboard
+├── app.py                         # Root entrypoint launcher (`python app.py`)
+├── requirements.txt               # Production Python dependencies
+├── README.md                      # System documentation & setup guide
+└── keystro.db                     # Local SQLite database
 ```
 
 ---

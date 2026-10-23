@@ -9,9 +9,14 @@ import random
 import numpy as np
 from datetime import datetime, timedelta
 
-import database as db
-import model_pipeline as mp
-import feature_extractor as fe
+import sys
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
+import core.database as db
+import core.model_pipeline as mp
+import core.feature_extractor as fe
 
 SAMPLE_TEXTS = [
     "The quick brown fox jumps over the lazy dog in the cyber laboratory.",

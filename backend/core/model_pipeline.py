@@ -20,7 +20,8 @@ from core.feature_extractor import (
     create_rolling_windows,
 )
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
 
