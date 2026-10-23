@@ -80,8 +80,24 @@ def create_app():
 app = create_app()
 
 
+import socket
+
+
+def find_available_port(preferred_port=5000):
+    for candidate in [preferred_port, 5001, 5050, 8080]:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("0.0.0.0", candidate))
+                return candidate
+            except OSError:
+                continue
+    return preferred_port
+
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    env_port = os.environ.get("PORT")
+    port = int(env_port) if env_port else find_available_port(5000)
     print("\n" + "=" * 65)
     print("  [+] KeyStro AI Continuous Keystroke Authentication is LIVE!")
     print(f"  >>> Dashboard URL: http://127.0.0.1:{port}")
