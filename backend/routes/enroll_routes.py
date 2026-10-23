@@ -15,8 +15,11 @@ logger = logging.getLogger("KeyStro.Enroll")
 
 @enroll_bp.route("/api/users", methods=["GET"])
 def get_users():
-    """Returns list of enrolled users."""
+    """Returns list of enrolled users. Filters to single user if ?username= is provided."""
+    username = request.args.get("username", "").strip()
     users = db.list_users()
+    if username:
+        users = [u for u in users if u["username"].lower() == username.lower()]
     return jsonify({
         "success": True,
         "count": len(users),

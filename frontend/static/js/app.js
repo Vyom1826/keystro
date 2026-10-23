@@ -32,8 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initMfaModal();
     initAlertSettingsModal();
 
-    // Fetch enrolled users and start initial session
+    // Fetch enrolled users, isolate dataset if logged in, and start initial session
     loadUsers();
+    loadMetrics();
 });
 
 // -------------------------------------------------------------
@@ -44,6 +45,7 @@ function initAuthPortal() {
     const openBtn = document.getElementById('openAuthModalBtn');
     const closeBtn = document.getElementById('closeAuthModalBtn');
     const closeRow = document.getElementById('closeAuthModalRow');
+    const signOutBtn = document.getElementById('navSignOutBtn');
     const tabSignIn = document.getElementById('authTabSignIn');
     const tabSignUp = document.getElementById('authTabSignUp');
     const formSignIn = document.getElementById('authSignInForm');
@@ -64,11 +66,30 @@ function initAuthPortal() {
             if (navAuthLabel) {
                 navAuthLabel.textContent = user.full_name ? `${user.full_name.split(' ')[0]}` : user.username;
             }
+            if (signOutBtn) signOutBtn.style.display = 'inline-flex';
             modal.classList.remove('active');
         } catch (e) {
             localStorage.removeItem('keystro_auth_user');
         }
     }
+
+    // Handle Sign Out
+    signOutBtn?.addEventListener('click', async () => {
+        localStorage.removeItem('keystro_auth_user');
+        State.authenticatedUser = null;
+        if (navAuthLabel) navAuthLabel.textContent = 'Sign In / Register';
+        if (signOutBtn) signOutBtn.style.display = 'none';
+        const userSelect = document.getElementById('userSelect');
+        if (userSelect) userSelect.disabled = false;
+        const enrollUserEl = document.getElementById('enrollUsername');
+        if (enrollUserEl) {
+            enrollUserEl.disabled = false;
+            enrollUserEl.value = '';
+        }
+        await loadUsers();
+        await loadMetrics();
+        alert('Signed out. Switched to public baseline overview.');
+    });
 
     function showBanner(msg, isSuccess = false) {
         if (!banner) return;
@@ -153,18 +174,25 @@ function initAuthPortal() {
                 if (navAuthLabel) {
                     navAuthLabel.textContent = data.user.full_name ? data.user.full_name.split(' ')[0] : data.user.username;
                 }
+                if (signOutBtn) signOutBtn.style.display = 'inline-flex';
 
                 modal.classList.remove('active');
+
+                // Load ONLY the logged in user's dataset and remove others
+                await loadUsers(data.user.username);
+                await loadMetrics(data.user.username);
 
                 if (data.is_enrolled) {
                     // Switch to Workspace
                     document.querySelector('.tab-btn[data-tab="workspacePane"]')?.click();
-                    await loadUsers(data.user.username);
                 } else {
                     // Navigate to Enrollment Pane for Calibration
                     document.querySelector('.tab-btn[data-tab="enrollmentPane"]')?.click();
                     const enrollUserEl = document.getElementById('enrollUsername');
-                    if (enrollUserEl) enrollUserEl.value = data.user.username;
+                    if (enrollUserEl) {
+                        enrollUserEl.value = data.user.username;
+                        enrollUserEl.disabled = true;
+                    }
                     alert(`Welcome, ${data.user.full_name || data.user.username}! Please complete your 3 typing calibration passages to activate your keystroke profile.`);
                 }
             } else {
@@ -231,9 +259,14 @@ function initAuthPortal() {
                 if (navAuthLabel) {
                     navAuthLabel.textContent = fullName.split(' ')[0] || username;
                 }
+                if (signOutBtn) signOutBtn.style.display = 'inline-flex';
 
                 // Close welcome portal
                 modal.classList.remove('active');
+
+                // Load ONLY the logged-in user's dataset and remove others
+                await loadUsers(username);
+                await loadMetrics(username);
 
                 // Switch to the Biometric Enrollment Tab
                 document.querySelector('.tab-btn[data-tab="enrollmentPane"]')?.click();
@@ -303,6 +336,23 @@ async function loadUsers(preferredUser = null) {
     const userSelect = document.getElementById('userSelect');
     if (!userSelect) return;
 
+    const authUser = State.authenticatedUser;
+    if (authUser && authUser.username) {
+        // Authenticated user mode: ONLY show their dataset, completely hide other users
+        userSelect.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = authUser.username;
+        opt.textContent = `${authUser.full_name || authUser.username} (My Dataset)`;
+        userSelect.appendChild(opt);
+        userSelect.value = authUser.username;
+        userSelect.disabled = true;
+
+        State.usersList = [{ username: authUser.username, avg_speed: 300 }];
+        await startSession(authUser.username);
+        return;
+    }
+
+    userSelect.disabled = false;
     try {
         const res = await fetch('/api/users');
         const data = await res.json();
@@ -314,7 +364,7 @@ async function loadUsers(preferredUser = null) {
             data.users.forEach((u) => {
                 const opt = document.createElement('option');
                 opt.value = u.username;
-                opt.textContent = `${u.username} (${Math.round(u.avg_speed || 300)} KPM)`;
+                opt.textContent = `${u.full_name ? u.full_name + ' (' + u.username + ')' : u.username} (${Math.round(u.avg_speed || 300)} KPM)`;
                 userSelect.appendChild(opt);
             });
 
@@ -354,7 +404,14 @@ async function startSession(username) {
     const avatarEl = document.getElementById('avatarLetter');
     const portalUserEl = document.getElementById('portalUserName');
     if (avatarEl) avatarEl.textContent = username.charAt(0).toUpperCase();
-    if (portalUserEl) portalUserEl.textContent = `User: ${username} (Corporate Terminal)`;
+
+    const authUser = State.authenticatedUser;
+    const isAuth = authUser && authUser.username.toLowerCase() === username.toLowerCase();
+    if (portalUserEl) {
+        portalUserEl.textContent = isAuth 
+            ? `User: ${authUser.full_name || username} (My Dataset)`
+            : `User: ${username} (Corporate Terminal)`;
+    }
 
     try {
         const res = await fetch('/api/start-session', {
@@ -808,9 +865,12 @@ function initAlertSettingsModal() {
 // -------------------------------------------------------------
 // Security Analytics & Verification Logs Loader
 // -------------------------------------------------------------
-async function loadMetrics() {
+async function loadMetrics(scopedUser = null) {
     try {
-        const res = await fetch('/api/metrics');
+        const authUser = State.authenticatedUser;
+        const targetUser = scopedUser || (authUser ? authUser.username : null);
+        const url = targetUser ? `/api/metrics?username=${encodeURIComponent(targetUser)}` : '/api/metrics';
+        const res = await fetch(url);
         const data = await res.json();
 
         if (data.success) {
@@ -828,12 +888,20 @@ async function loadMetrics() {
             // Populate table
             const tbody = document.getElementById('logsTableBody');
             if (tbody && data.logs) {
-                if (data.logs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">No verification logs recorded yet.</td></tr>`;
+                let displayLogs = data.logs;
+                if (targetUser) {
+                    displayLogs = displayLogs.filter(log => log.username.toLowerCase() === targetUser.toLowerCase());
+                }
+
+                if (displayLogs.length === 0) {
+                    const emptyMsg = targetUser 
+                        ? `No verification telemetry logs recorded yet for ${targetUser}. Type in the workspace to evaluate!`
+                        : 'No verification logs recorded yet.';
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">${emptyMsg}</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = data.logs.map(log => {
+                tbody.innerHTML = displayLogs.map(log => {
                     const timeStr = log.timestamp ? log.timestamp.split('T')[1].split('.')[0] : '--:--:--';
                     const scorePercent = Math.round(log.score * 100);
                     let badgeClass = 'low';

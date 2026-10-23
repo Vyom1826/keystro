@@ -24,10 +24,12 @@ def health_check():
 def get_metrics():
     """
     Returns security analytics, FAR, FRR, EER, and recent verification telemetry logs.
+    Supports filtering by username so when user logs in, only their dataset is shown.
     """
     session_id = request.args.get("session_id")
-    stats = db.get_security_metrics()
-    recent_logs = db.get_recent_logs(session_id=session_id, limit=30)
+    username = request.args.get("username", "").strip()
+    stats = db.get_security_metrics(username=username)
+    recent_logs = db.get_recent_logs(session_id=session_id, username=username, limit=50)
 
     return jsonify({
         "success": True,

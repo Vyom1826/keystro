@@ -536,15 +536,27 @@ def log_verification(session_id, username, score, risk_level, features, is_anoma
     conn.close()
 
 
-def get_recent_logs(session_id=None, limit=50):
+def get_recent_logs(session_id=None, username=None, limit=50):
     conn = get_db()
     cursor = conn.cursor()
-    if session_id:
+    if session_id and username:
+        cursor.execute("""
+            SELECT * FROM verification_logs
+            WHERE session_id = ? AND LOWER(username) = LOWER(?)
+            ORDER BY id DESC LIMIT ?
+        """, (session_id, username, limit))
+    elif session_id:
         cursor.execute("""
             SELECT * FROM verification_logs
             WHERE session_id = ?
             ORDER BY id DESC LIMIT ?
         """, (session_id, limit))
+    elif username:
+        cursor.execute("""
+            SELECT * FROM verification_logs
+            WHERE LOWER(username) = LOWER(?)
+            ORDER BY id DESC LIMIT ?
+        """, (username, limit))
     else:
         cursor.execute("""
             SELECT * FROM verification_logs
@@ -555,9 +567,9 @@ def get_recent_logs(session_id=None, limit=50):
     return [dict(r) for r in reversed(rows)]
 
 
-def get_security_metrics():
+def get_security_metrics(username=None):
     """
-    Compute aggregate security metrics:
+    Compute aggregate security metrics for all users or scoped to a specific logged-in user:
     - Total evaluations
     - Total anomalies
     - False Acceptance Rate (FAR) estimation: imposter tests that scored > 0.70
@@ -567,7 +579,10 @@ def get_security_metrics():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) AS total FROM verification_logs")
+    if username:
+        cursor.execute("SELECT COUNT(*) AS total FROM verification_logs WHERE LOWER(username) = LOWER(?)", (username,))
+    else:
+        cursor.execute("SELECT COUNT(*) AS total FROM verification_logs")
     total_evals = cursor.fetchone()["total"]
 
     if total_evals == 0:
@@ -577,33 +592,45 @@ def get_security_metrics():
             "total_anomalies": 0,
             "far_percentage": 0.0,
             "frr_percentage": 0.0,
-            "eer_percentage": 1.5,
-            "average_confidence": 0.0,
-            "active_users": 0
+            "eer_percentage": 0.0,
+            "average_confidence": 100.0,
+            "active_users": 1 if username else 0
         }
 
-    cursor.execute("SELECT COUNT(*) AS anomalies FROM verification_logs WHERE is_anomaly = 1")
+    if username:
+        cursor.execute("SELECT COUNT(*) AS anomalies FROM verification_logs WHERE LOWER(username) = LOWER(?) AND is_anomaly = 1", (username,))
+    else:
+        cursor.execute("SELECT COUNT(*) AS anomalies FROM verification_logs WHERE is_anomaly = 1")
     total_anomalies = cursor.fetchone()["anomalies"]
 
     # Imposter tests evaluation
-    cursor.execute("SELECT COUNT(*) AS imp_total, SUM(CASE WHEN score >= 0.70 THEN 1 ELSE 0 END) AS imp_accepted FROM verification_logs WHERE is_imposter_simulation = 1")
+    if username:
+        cursor.execute("SELECT COUNT(*) AS imp_total, SUM(CASE WHEN score >= 0.70 THEN 1 ELSE 0 END) AS imp_accepted FROM verification_logs WHERE LOWER(username) = LOWER(?) AND is_imposter_simulation = 1", (username,))
+    else:
+        cursor.execute("SELECT COUNT(*) AS imp_total, SUM(CASE WHEN score >= 0.70 THEN 1 ELSE 0 END) AS imp_accepted FROM verification_logs WHERE is_imposter_simulation = 1")
     imp_row = cursor.fetchone()
     imp_total = imp_row["imp_total"] or 0
     imp_accepted = imp_row["imp_accepted"] or 0
-    far = (imp_accepted / imp_total * 100.0) if imp_total > 0 else 1.25
+    far = (imp_accepted / imp_total * 100.0) if imp_total > 0 else 0.0
 
     # Genuine tests evaluation
-    cursor.execute("SELECT COUNT(*) AS gen_total, SUM(CASE WHEN score < 0.40 THEN 1 ELSE 0 END) AS gen_rejected FROM verification_logs WHERE is_imposter_simulation = 0")
+    if username:
+        cursor.execute("SELECT COUNT(*) AS gen_total, SUM(CASE WHEN score < 0.40 THEN 1 ELSE 0 END) AS gen_rejected FROM verification_logs WHERE LOWER(username) = LOWER(?) AND is_imposter_simulation = 0", (username,))
+    else:
+        cursor.execute("SELECT COUNT(*) AS gen_total, SUM(CASE WHEN score < 0.40 THEN 1 ELSE 0 END) AS gen_rejected FROM verification_logs WHERE is_imposter_simulation = 0")
     gen_row = cursor.fetchone()
     gen_total = gen_row["gen_total"] or 0
     gen_rejected = gen_row["gen_rejected"] or 0
-    frr = (gen_rejected / gen_total * 100.0) if gen_total > 0 else 2.10
+    frr = (gen_rejected / gen_total * 100.0) if gen_total > 0 else 0.0
 
     # Equal Error Rate approximation
     eer = round((far + frr) / 2.0, 2)
 
-    cursor.execute("SELECT AVG(score) AS avg_score FROM verification_logs WHERE is_imposter_simulation = 0")
-    avg_score = cursor.fetchone()["avg_score"] or 0.88
+    if username:
+        cursor.execute("SELECT AVG(score) AS avg_score FROM verification_logs WHERE LOWER(username) = LOWER(?) AND is_imposter_simulation = 0", (username,))
+    else:
+        cursor.execute("SELECT AVG(score) AS avg_score FROM verification_logs WHERE is_imposter_simulation = 0")
+    avg_score = cursor.fetchone()["avg_score"] or 0.95
 
     cursor.execute("SELECT COUNT(*) AS user_count FROM users")
     user_count = cursor.fetchone()["user_count"]
