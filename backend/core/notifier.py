@@ -64,9 +64,14 @@ def _dispatch_alert_async(username: str, session_id: str, risk_level: str, score
     score_pct = round(score * 100, 1)
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
+    # Look up registered user for email / phone fallback
+    user_record = db.get_user(username) if username else None
+    user_email = (user_record.get("email") or "").strip() if user_record else ""
+    user_phone = (user_record.get("phone") or "").strip() if user_record else ""
+
     # 1. Dispatch Email if enabled
     if settings.get("email_enabled", 1):
-        recipient_email = settings.get("alert_email", "").strip()
+        recipient_email = settings.get("alert_email", "").strip() or user_email
         smtp_user = settings.get("smtp_user", "").strip()
         smtp_pass = settings.get("smtp_pass", "").strip()
         smtp_host = settings.get("smtp_host", "smtp.gmail.com").strip()
@@ -121,7 +126,7 @@ If this session was not authorized by the legitimate owner, lock the terminal or
 
     # 2. Dispatch SMS if enabled
     if settings.get("sms_enabled", 1):
-        recipient_phone = settings.get("alert_phone", "").strip()
+        recipient_phone = settings.get("alert_phone", "").strip() or user_phone
         twilio_sid = settings.get("twilio_sid", "").strip()
         twilio_token = settings.get("twilio_token", "").strip()
         twilio_from = settings.get("twilio_from", "").strip()
