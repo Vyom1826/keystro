@@ -27,9 +27,9 @@ def get_metrics():
     Supports filtering by username so when user logs in, only their dataset is shown.
     """
     session_id = request.args.get("session_id")
-    username = request.args.get("username", "").strip()
+    username = request.args.get("username", "").strip() or None
     stats = db.get_security_metrics(username=username)
-    recent_logs = db.get_recent_logs(session_id=session_id, username=username, limit=50)
+    recent_logs = db.get_recent_logs(session_id=session_id, username=username, limit=200)
 
     return jsonify({
         "success": True,

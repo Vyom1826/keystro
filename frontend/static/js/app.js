@@ -178,9 +178,9 @@ function initAuthPortal() {
 
                 modal.classList.remove('active');
 
-                // Load ONLY the logged in user's dataset and remove others
+                // Load all users and prototype database telemetry
                 await loadUsers(data.user.username);
-                await loadMetrics(data.user.username);
+                await loadMetrics();
 
                 if (data.is_enrolled) {
                     // Switch to Workspace
@@ -264,9 +264,9 @@ function initAuthPortal() {
                 // Close welcome portal
                 modal.classList.remove('active');
 
-                // Load ONLY the logged-in user's dataset and remove others
+                // Load all users and prototype database telemetry
                 await loadUsers(username);
-                await loadMetrics(username);
+                await loadMetrics();
 
                 // Switch to the Biometric Enrollment Tab
                 document.querySelector('.tab-btn[data-tab="enrollmentPane"]')?.click();
@@ -336,22 +336,6 @@ async function loadUsers(preferredUser = null) {
     const userSelect = document.getElementById('userSelect');
     if (!userSelect) return;
 
-    const authUser = State.authenticatedUser;
-    if (authUser && authUser.username) {
-        // Authenticated user mode: ONLY show their dataset, completely hide other users
-        userSelect.innerHTML = '';
-        const opt = document.createElement('option');
-        opt.value = authUser.username;
-        opt.textContent = `${authUser.full_name || authUser.username} (My Dataset)`;
-        userSelect.appendChild(opt);
-        userSelect.value = authUser.username;
-        userSelect.disabled = true;
-
-        State.usersList = [{ username: authUser.username, avg_speed: 300 }];
-        await startSession(authUser.username);
-        return;
-    }
-
     userSelect.disabled = false;
     try {
         const res = await fetch('/api/users');
@@ -361,17 +345,21 @@ async function loadUsers(preferredUser = null) {
             State.usersList = data.users;
             userSelect.innerHTML = '';
 
+            const authUser = State.authenticatedUser;
+
             data.users.forEach((u) => {
                 const opt = document.createElement('option');
                 opt.value = u.username;
-                opt.textContent = `${u.full_name ? u.full_name + ' (' + u.username + ')' : u.username} (${Math.round(u.avg_speed || 300)} KPM)`;
+                const isAuth = authUser && authUser.username.toLowerCase() === u.username.toLowerCase();
+                const displayName = u.full_name ? `${u.full_name} (${u.username})` : u.username;
+                opt.textContent = `${displayName} (${Math.round(u.avg_speed || 300)} KPM)${isAuth ? ' ★ (Active Account)' : ''}`;
                 userSelect.appendChild(opt);
             });
 
-            // Retain preferred or currently active user if present, else default to first
-            const targetUser = preferredUser || State.currentUser;
-            const userExists = data.users.some((u) => u.username === targetUser);
-            const activeUser = userExists ? targetUser : data.users[0].username;
+            // Retain preferred or currently active user if present, else default to authenticated or first user
+            const targetUser = preferredUser || (authUser ? authUser.username : State.currentUser);
+            const userExists = data.users.some((u) => u.username.toLowerCase() === (targetUser || '').toLowerCase());
+            const activeUser = userExists ? data.users.find(u => u.username.toLowerCase() === targetUser.toLowerCase()).username : data.users[0].username;
 
             userSelect.value = activeUser;
             startSession(activeUser);
@@ -867,9 +855,8 @@ function initAlertSettingsModal() {
 // -------------------------------------------------------------
 async function loadMetrics(scopedUser = null) {
     try {
-        const authUser = State.authenticatedUser;
-        const targetUser = scopedUser || (authUser ? authUser.username : null);
-        const url = targetUser ? `/api/metrics?username=${encodeURIComponent(targetUser)}` : '/api/metrics';
+        // Load all database verification logs and metrics for prototype demonstration
+        const url = scopedUser ? `/api/metrics?username=${encodeURIComponent(scopedUser)}` : '/api/metrics';
         const res = await fetch(url);
         const data = await res.json();
 
@@ -885,18 +872,18 @@ async function loadMetrics(scopedUser = null) {
             if (frrEl) frrEl.textContent = `${m.frr_percentage}%`;
             if (eerEl) eerEl.textContent = `${m.eer_percentage}%`;
 
-            // Populate table
+            // Populate table with all telemetry logs from database
             const tbody = document.getElementById('logsTableBody');
             if (tbody && data.logs) {
                 let displayLogs = data.logs;
-                if (targetUser) {
-                    displayLogs = displayLogs.filter(log => log.username.toLowerCase() === targetUser.toLowerCase());
+                if (scopedUser) {
+                    displayLogs = displayLogs.filter(log => log.username.toLowerCase() === scopedUser.toLowerCase());
                 }
 
                 if (displayLogs.length === 0) {
-                    const emptyMsg = targetUser 
-                        ? `No verification telemetry logs recorded yet for ${targetUser}. Type in the workspace to evaluate!`
-                        : 'No verification logs recorded yet.';
+                    const emptyMsg = scopedUser 
+                        ? `No verification telemetry logs recorded yet for ${scopedUser}. Type in the workspace to evaluate!`
+                        : 'No verification logs recorded yet in database.';
                     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">${emptyMsg}</td></tr>`;
                     return;
                 }
